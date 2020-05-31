@@ -1,0 +1,188 @@
+#include <SPI.h>
+#include <nRF24L01.h>
+#include <RF24.h>
+RF24 radio(9,10); //CE, CSN
+
+byte address [][6] = {"1Node", "2Node"};
+
+bool radioNumber = 1;
+
+//Variables for joystick and button for radio transmission
+#define Px A0
+#define Py A1
+
+int buttonAs = 0;
+int buttonBs = 0;
+int buttonCs = 0;
+int buttonDs = 0;
+int buttonEs = 0;
+int buttonFs = 0;
+int buttonKs = 0;
+//------------------------------------------------------------------------------------------------------  
+const int buttonAp = 2;
+const int buttonBp = 3;
+const int buttonCp = 4;
+const int buttonDp = 5;
+const int buttonEp = 6;
+const int buttonFp = 7;
+const int buttonKp = 8;
+int buttons[] = {buttonAp, buttonBp, buttonCp, buttonDp, buttonEp, buttonFp, buttonKp,};
+
+int A, B, C, D, E, F, K;
+//------------------------------------------------------------------------------------------------------  
+
+/**
+  Data structure for transmitting and receiving data 
+ */
+struct dataStruct {
+   unsigned long _micros;
+   float value;
+   byte Lspeed;
+   byte Rspeed;
+   int Ldir;
+   int Rdir;
+} myData;
+
+//------------------------------------------------------------------------------------------------------  
+
+
+void setup() {
+   Serial.begin(9600);
+
+   pinMode (Px, INPUT);
+   pinMode (Py, INPUT);
+  
+   for (int i; i<7; i++) pinMode(buttons[i], INPUT_PULLUP);
+   
+   radio.begin();
+   radio.setPALevel(RF24_PA_LOW);
+
+   if (radioNumber) {
+      radio.openWritingPipe(address[1]);
+      radio.openReadingPipe(1, address[0]);
+   } else {
+      radio.openWritingPipe(address[0]);
+      radio.openReadingPipe(1, address[1]);
+   }
+
+  myData.value = 0;
+  myData.Lspeed = 0;
+  myData.Rspeed = 0;
+  myData.Ldir = 0;
+  myData.Rdir = 0;
+
+// Start the radio listening for data
+  radio.startListening();
+}
+
+//------------------------------------------------------------------------------------------------------  
+
+void loop() { 
+
+   int x, y;
+
+   x = analogRead(Px);
+   y = analogRead(Px);
+
+   buttonAs = digitalRead(buttonAp);
+   buttonBs = digitalRead(buttonBp);
+   buttonCs = digitalRead(buttonCp);
+   buttonDs = digitalRead(buttonDp);
+   buttonEs = digitalRead(buttonCp);
+   buttonFs = digitalRead(buttonDp);
+   buttonKs = digitalRead(buttonKp);
+
+   myData.value = A + B + C + D + E + F + K;
+
+   if (buttonAs == LOW) {
+    A = 1;
+  } else {
+    A = 0;
+  }
+  if (buttonBs == LOW) {
+    B = 2;
+  } else {
+    B = 0;
+  }
+  if (buttonDs == LOW) {
+    D = 4;
+  } else {
+    D = 0;
+  }
+  if (buttonCs == LOW) {
+    C = 8;
+  } else {
+    C = 0;
+  }
+  if (buttonDs == LOW) {
+    D = 16;
+  } else {
+    D = 0;
+  }
+  if (buttonEs == LOW) {
+    E = 32;
+  } else {
+    E = 0;
+  }
+  if (buttonFs == LOW) {
+    F = 64;
+  } else {
+    F = 0;
+  }
+  if (buttonKs == LOW) {
+    K = 128;
+  } else {
+    K = 0;
+  }
+  
+  radio.stopListening();         
+
+  Serial.println(F("Now sending"));
+  myData._micros = micros();
+                                     // First, stop listening so we can talk.
+  if (!radio.write( &myData, sizeof(myData))) {
+    Serial.println(F("error1"));
+  }
+  else if (!radio.write( &x, sizeof(x))) {
+    Serial.println(F("error2"));
+  }
+  else if (!radio.write( &y, sizeof(y))){
+    Serial.println(F("error3"));
+  }
+    
+  radio.startListening();                                    // Now, continue listening
+
+  unsigned long started_waiting_at = micros();               // Set up a timeout period, get the current microseconds
+  boolean timeout = false;                                   // Set up a variable to indicate if a response was received or not
+
+  while ( ! radio.available() ) {                            // While nothing is received
+    if (micros() - started_waiting_at > 200000 ) {           // If waited longer than 200ms, indicate timeout and exit while loop
+      timeout = true;
+      break;
+    }
+  }
+
+  if ( timeout ) {                                            // Describe the results
+    Serial.println(F("Failed, response timed out."));
+  } else {
+    // Grab the response, compare, and send to debugging spew
+    radio.read( &myData, sizeof(myData) );
+    radio.read( &x, sizeof(x));
+    radio.read( &y, sizeof(x));
+    unsigned long time = micros();
+
+    // Spew it
+    Serial.print(F("Sent "));
+    Serial.print(time);
+    Serial.print(F(", Got response "));
+    Serial.print(myData._micros);
+    Serial.print(F(", Round-trip delay "));
+    Serial.print(time - myData._micros);
+    Serial.print(F(" microseconds Value "));
+    Serial.println(myData.value);
+    Serial.println(x);
+    Serial.println(y);       
+  }
+} 
+
+  

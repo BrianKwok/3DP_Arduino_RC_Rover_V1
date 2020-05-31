@@ -1,0 +1,78 @@
+#include <SPI.h>
+#include <L298N.h>
+#include <RF24.h>
+
+byte addresses[][6] = {"1Node", "2Node"};
+
+bool radioNumber = 0;
+
+RF24 radio(9, 10);
+
+
+struct dataStruct {
+  unsigned long _micros;
+  float value;
+  byte Lspeed;
+  byte Rspeed;
+  int Ldir;
+  int Rdir;
+} myData;
+
+void setup() {
+
+  Serial.begin(9600);
+
+  radio.begin();
+
+
+  radio.setPALevel(RF24_PA_LOW);
+
+  // Open a writing and reading pipe on each radio, with opposite addresses
+  if (radioNumber) {
+    radio.openWritingPipe(addresses[1]);
+    radio.openReadingPipe(1, addresses[0]);
+  } else {
+    radio.openWritingPipe(addresses[0]);
+    radio.openReadingPipe(1, addresses[1]);
+  }
+
+  myData.value = 0;
+  myData.Lspeed = 0;
+  myData.Rspeed = 0;
+  myData.Ldir = 0;
+  myData.Rdir = 0;
+
+  // Start the radio listening for data
+  radio.startListening();
+}
+
+void loop() {
+
+  int x, y;
+
+  if ( radio.available()) {
+    // Variable for the received timestamp
+    while (radio.available()) {                          // While there is data ready
+      radio.read( &myData, sizeof(myData) );             // Get the payload
+      radio.read( &x, sizeof(x));
+      radio.read( &y, sizeof(x));                  
+    }
+
+    radio.stopListening();                               // First, stop listening so we can talk
+    myData.value;                                        // Increment the float value
+    radio.write( &myData, sizeof(myData) );              // Send the final one back.
+    radio.startListening();                              // Now, resume listening so we catch the next packets.
+    Serial.print(F("Sent response "));
+    Serial.print(myData._micros);
+    Serial.print(F(" : "));
+    Serial.println(myData.value);
+    Serial.println(x);
+    Serial.println(y);   
+
+    }
+   else {
+    Serial.print (F("RF Offline"));
+   }
+  }
+// Loop
+
